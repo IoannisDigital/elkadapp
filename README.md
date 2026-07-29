@@ -13,6 +13,21 @@
 ## Πεδία ανά επιχείρηση
 Επωνυμία, ΑΦΜ, Διεύθυνση, Πόλη, ΤΚ, Νομός, Τηλέφωνο, Email, Website.
 
+## Χωρίς εγκατεστημένη Python (έτοιμο εκτελέσιμο)
+
+Το repo χτίζει αυτόματα **αυτόνομα εκτελέσιμα** (Windows `.exe`, macOS `.app`,
+Linux binary) μέσω GitHub Actions — τρέχουν **χωρίς να εγκαταστήσεις Python**.
+
+Πώς τα κατεβάζεις:
+1. Πήγαινε στην καρτέλα **Actions** του repo →
+   [Build standalone app](https://github.com/IoannisDigital/elkadapp/actions/workflows/build.yml)
+2. Άνοιξε το πιο πρόσφατο (πράσινο ✓) run.
+3. Κάτω-κάτω, στα **Artifacts**, κατέβασε `GEMI-Elkad-Windows` (ή macOS/Linux).
+4. Αποσυμπίεσε και τρέξε το `GEMI-Elkad.exe` (Windows) — διπλό κλικ, τίποτα άλλο.
+
+> Στα Windows, το SmartScreen μπορεί να προειδοποιήσει για «άγνωστο εκδότη»
+> (το εκτελέσιμο δεν είναι code-signed) — **More info → Run anyway**.
+
 ## Γρήγορη εκκίνηση (γραφική εφαρμογή)
 
 - **Windows:** διπλό κλικ στο **`run_windows.bat`**
