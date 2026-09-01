@@ -292,8 +292,8 @@ class App(tk.Tk):
         left = ttk.Labelframe(body, text="1) ΚΑΔ", style="Card.TLabelframe")
         body.add(left, weight=3)
 
-        # Grid layout: η γραμμή των αποτελεσμάτων (row 2) μεγαλώνει· όλα τα
-        # υπόλοιπα (κουμπιά, επιλεγμένοι) έχουν σταθερή θέση και είναι πάντα ορατά.
+        # Grid layout: μόνο η λίστα αποτελεσμάτων (row 2) μεγαλώνει· οι
+        # επιλεγμένοι ΚΑΔ φαίνονται σε μία γραμμή (row 4), χωρίς δεύτερη λίστα.
         left.columnconfigure(0, weight=1)
         left.rowconfigure(2, weight=1)
 
@@ -310,14 +310,14 @@ class App(tk.Tk):
                    command=self.do_search).pack(side="left")
 
         # row 1: ετικέτα αποτελεσμάτων
-        ttk.Label(left, text="Αποτελέσματα (κλικ για επιλογή, μετά «➕ Προσθήκη» ή «Έναρξη»):",
+        ttk.Label(left, text="Αποτελέσματα (κλικ/Ctrl για πολλαπλή, μετά «➕ Προσθήκη» ή «Έναρξη»):",
                   background=CARD, foreground=MUTED).grid(row=1, column=0, sticky="w",
                                                           padx=6)
-        # row 2: λίστα αποτελεσμάτων (μεγαλώνει)
+        # row 2: λίστα αποτελεσμάτων (μεγαλώνει — το κύριο στοιχείο)
         res_wrap = ttk.Frame(left)
         res_wrap.grid(row=2, column=0, sticky="nsew", padx=6, pady=(0, 6))
         self.results = ttk.Treeview(res_wrap, columns=("id", "descr"), show="headings",
-                                    height=8, selectmode="extended")
+                                    height=12, selectmode="extended")
         self.results.heading("id", text="ΚΑΔ")
         self.results.heading("descr", text="Περιγραφή")
         self.results.column("id", width=100, anchor="w", stretch=False)
@@ -335,29 +335,14 @@ class App(tk.Tk):
                    command=self.add_selected).pack(side="left")
         ttk.Button(arow, text="Προσθήκη με κωδικό…", style="Ghost.TButton",
                    command=self.add_manual).pack(side="left", padx=6)
+        ttk.Button(arow, text="🗑 Καθαρισμός", style="Ghost.TButton",
+                   command=self.clear_selected).pack(side="left", padx=6)
 
-        # row 4: ετικέτα επιλεγμένων
-        ttk.Label(left, text="Επιλεγμένοι ΚΑΔ προς εξαγωγή (1 Excel ανά ΚΑΔ):",
-                  background=CARD, foreground=MUTED).grid(row=4, column=0, sticky="w",
-                                                          padx=6)
-        # row 5: λίστα επιλεγμένων (σταθερό ύψος)
-        sel_wrap = ttk.Frame(left, style="Card.TFrame")
-        sel_wrap.grid(row=5, column=0, sticky="ew", padx=6, pady=(0, 4))
-        self.chosen = ttk.Treeview(sel_wrap, columns=("id", "descr"), show="headings",
-                                  height=4, selectmode="extended")
-        self.chosen.heading("id", text="ΚΑΔ")
-        self.chosen.heading("descr", text="Περιγραφή")
-        self.chosen.column("id", width=100, anchor="w", stretch=False)
-        self.chosen.column("descr", width=380, anchor="w")
-        csb = ttk.Scrollbar(sel_wrap, orient="vertical", command=self.chosen.yview)
-        self.chosen.configure(yscrollcommand=csb.set)
-        self.chosen.pack(side="left", fill="x", expand=True)
-        csb.pack(side="right", fill="y")
-
-        # row 6: αφαίρεση
-        ttk.Button(left, text="➖ Αφαίρεση επιλεγμένου", style="Ghost.TButton",
-                   command=self.remove_selected).grid(row=6, column=0, sticky="w",
-                                                      padx=6, pady=(0, 6))
+        # row 4: επιλεγμένοι ΚΑΔ σε μία γραμμή (χωρίς δεύτερη λίστα)
+        self.chosen_var = tk.StringVar(value="Επιλεγμένοι ΚΑΔ: (κανένας)")
+        ttk.Label(left, textvariable=self.chosen_var, background=CARD, foreground=NAVY,
+                  font=("Segoe UI", 9, "bold"), wraplength=520, justify="left").grid(
+            row=4, column=0, sticky="w", padx=6, pady=(0, 8))
 
         # ----- Δεξιά: νομοί -----
         right = ttk.Labelframe(body, text="2) Νομοί", style="Card.TLabelframe")
@@ -491,12 +476,18 @@ class App(tk.Tk):
         if kid in self.selected_kads:
             return
         self.selected_kads[kid] = descr
-        self.chosen.insert("", "end", iid=kid, values=(kid, descr))
+        self._update_chosen_label()
 
-    def remove_selected(self):
-        for item in self.chosen.selection():
-            self.selected_kads.pop(item, None)
-            self.chosen.delete(item)
+    def _update_chosen_label(self):
+        codes = list(self.selected_kads.keys())
+        if codes:
+            self.chosen_var.set(f"Επιλεγμένοι ΚΑΔ ({len(codes)}): " + ", ".join(codes))
+        else:
+            self.chosen_var.set("Επιλεγμένοι ΚΑΔ: (κανένας)")
+
+    def clear_selected(self):
+        self.selected_kads.clear()
+        self._update_chosen_label()
 
     def _chosen_prefectures(self):
         if self.all_pref_var.get():
