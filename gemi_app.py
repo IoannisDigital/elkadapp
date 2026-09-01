@@ -161,46 +161,70 @@ class App(tk.Tk):
                             cx + cap_w / 2, y + s * 0.82, fill=grey, outline="")
 
     def _load_logo_image(self, target_h):
-        """Αν υπάρχει assets/dms_logo.png, το φορτώνει και κλιμακώνει στο ύψος."""
-        path = resource_path(os.path.join("assets", "dms_logo.png"))
-        if not os.path.exists(path):
-            return None
+        """
+        Φορτώνει το λογότυπο από assets/dms_logo.png (ή το πρώτο διαθέσιμο PNG
+        στο assets/) και το κλιμακώνει στο ζητούμενο ύψος. Επιστρέφει None αν
+        δεν υπάρχει/δεν διαβάζεται.
+        """
+        candidates = [resource_path(os.path.join("assets", "dms_logo.png"))]
+        adir = resource_path("assets")
         try:
-            img = tk.PhotoImage(file=path)
-            factor = max(1, round(img.height() / target_h))
-            if factor > 1:
-                img = img.subsample(factor, factor)
-            return img
+            if os.path.isdir(adir):
+                for fn in sorted(os.listdir(adir)):
+                    if fn.lower().endswith(".png") and fn.lower() != "dms_logo.png":
+                        candidates.append(os.path.join(adir, fn))
         except Exception:
-            return None
+            pass
+        for path in candidates:
+            if not os.path.exists(path):
+                continue
+            try:
+                img = tk.PhotoImage(file=path)
+                factor = max(1, round(img.height() / target_h))
+                if factor > 1:
+                    img = img.subsample(factor, factor)
+                return img
+            except Exception:
+                continue
+        return None
 
     def _build_header(self):
-        h = 92
+        h = 96
         header = tk.Frame(self, bg=CARD, height=h)
         header.pack(side="top", fill="x")
         header.pack_propagate(False)
 
         self._logo_img = self._load_logo_image(64)
         if self._logo_img is not None:
+            try:
+                self.iconphoto(True, self._logo_img)
+            except Exception:
+                pass
+            # Το λογότυπο περιέχει ήδη την επωνυμία — δεν την επαναλαμβάνουμε.
             tk.Label(header, image=self._logo_img, bg=CARD).pack(
-                side="left", padx=(18, 14), pady=12)
+                side="left", padx=(18, 16), pady=12)
+            txt = tk.Frame(header, bg=CARD)
+            txt.pack(side="left", pady=16, anchor="w")
+            tk.Label(txt, text=APP_NAME, bg=CARD, fg=GREY,
+                     font=("Segoe UI", 15, "bold")).pack(anchor="w")
+            tk.Label(txt, text=MOTTO, bg=CARD, fg=MUTED,
+                     font=("Segoe UI", 9, "italic")).pack(anchor="w")
         else:
             cv = tk.Canvas(header, width=68, height=68, bg=CARD, highlightthickness=0)
             cv.pack(side="left", padx=(18, 14), pady=12)
             self._draw_logo(cv, 2, 2, 64)
-
-        txt = tk.Frame(header, bg=CARD)
-        txt.pack(side="left", pady=14, anchor="w")
-        row = tk.Frame(txt, bg=CARD)
-        row.pack(anchor="w")
-        tk.Label(row, text="DMS", bg=CARD, fg=BLUE,
-                 font=("Segoe UI", 20, "bold")).pack(side="left")
-        tk.Label(row, text=" Hellas", bg=CARD, fg=GREY,
-                 font=("Segoe UI", 20, "bold")).pack(side="left")
-        tk.Label(txt, text=COMPANY, bg=CARD, fg=GREY,
-                 font=("Segoe UI", 9)).pack(anchor="w")
-        tk.Label(txt, text=f"{APP_NAME} · {MOTTO}", bg=CARD, fg=MUTED,
-                 font=("Segoe UI", 9, "italic")).pack(anchor="w")
+            txt = tk.Frame(header, bg=CARD)
+            txt.pack(side="left", pady=14, anchor="w")
+            row = tk.Frame(txt, bg=CARD)
+            row.pack(anchor="w")
+            tk.Label(row, text="DMS", bg=CARD, fg=BLUE,
+                     font=("Segoe UI", 20, "bold")).pack(side="left")
+            tk.Label(row, text=" Hellas", bg=CARD, fg=GREY,
+                     font=("Segoe UI", 20, "bold")).pack(side="left")
+            tk.Label(txt, text=COMPANY, bg=CARD, fg=GREY,
+                     font=("Segoe UI", 9)).pack(anchor="w")
+            tk.Label(txt, text=f"{APP_NAME} · {MOTTO}", bg=CARD, fg=MUTED,
+                     font=("Segoe UI", 9, "italic")).pack(anchor="w")
 
         # μπλε γραμμή-τόνος κάτω από το header
         tk.Frame(self, bg=BLUE, height=3).pack(side="top", fill="x")
