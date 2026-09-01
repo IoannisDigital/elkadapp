@@ -40,7 +40,12 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt pyinstaller
+          pip install -r requirements.txt pyinstaller pyflakes
+
+      - name: Lint (catch undefined names / syntax errors)
+        run: |
+          python -m pyflakes gemi_core.py gemi_pull.py gemi_app.py
+          python -c "import ast; [ast.parse(open(f).read()) for f in ('gemi_core.py','gemi_pull.py','gemi_app.py')]"
 
       - name: Build executable
         run: pyinstaller GEMI-Elkad.spec

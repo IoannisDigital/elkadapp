@@ -120,7 +120,7 @@ class App(tk.Tk):
         st.map("Ghost.TButton", background=[("active", "#C3CEE0")])
         st.configure("Accent.TButton", font=("Segoe UI", 9, "bold"), padding=(10, 5),
                      background=NAVY, foreground="white", borderwidth=0)
-        st.map("Accent.TButton", background=[("active", NAVY_DK)])
+        st.map("Accent.TButton", background=[("active", BLUE_DK)])
 
         # Μπάρα προόδου
         st.configure("Brand.Horizontal.TProgressbar", troughcolor="#D7DEEA",
