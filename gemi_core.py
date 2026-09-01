@@ -101,7 +101,7 @@ def _excluded(name, exclude):
 
 
 def fetch_kad(kad, prefectures="ALL", api_key=None, primary_only=True,
-              exclude=None, progress=None, should_stop=None):
+              exclude=None, progress=None, should_stop=None, on_progress=None):
     """
     Αντλεί όλες τις εγγραφές για έναν ΚΑΔ.
 
@@ -110,8 +110,9 @@ def fetch_kad(kad, prefectures="ALL", api_key=None, primary_only=True,
     api_key      : προαιρετικό override
     primary_only : κράτα μόνο εγγραφές με τον ΚΑΔ ως Κύρια δραστηριότητα
     exclude      : λίστα αποκλεισμού brand (default: DEFAULT_EXCLUDE)
-    progress     : προαιρετικό callable(message:str) για ενημέρωση προόδου
+    progress     : προαιρετικό callable(message:str) για κείμενο προόδου
     should_stop  : προαιρετικό callable()->bool για ακύρωση από τον χρήστη
+    on_progress  : προαιρετικό callable(scanned:int, total:int) για μπάρα προόδου
 
     Επιστρέφει λίστα από γραμμές (κάθε γραμμή με τη σειρά του HDR).
     """
@@ -174,9 +175,13 @@ def fetch_kad(kad, prefectures="ALL", api_key=None, primary_only=True,
             ])
         off += len(arr)
         log(f"  {kad}: κρατήθηκαν {len(rows)} / σαρώθηκαν {off}/{total}")
+        if on_progress:
+            on_progress(off, total or off)
         if len(arr) < PAGE:
             break
         time.sleep(SLEEP)
+    if on_progress:
+        on_progress(total or off, total or off)  # 100% στο τέλος
     return rows
 
 
@@ -238,7 +243,8 @@ def build_xlsx(rows, path):
 
 
 def export_kad(kad, prefectures="ALL", out_dir="output", api_key=None,
-               primary_only=True, exclude=None, progress=None, should_stop=None):
+               primary_only=True, exclude=None, progress=None, should_stop=None,
+               on_progress=None):
     """
     Αντλεί έναν ΚΑΔ και γράφει το αντίστοιχο .xlsx.
     Επιστρέφει (path, rows).
@@ -246,7 +252,8 @@ def export_kad(kad, prefectures="ALL", out_dir="output", api_key=None,
     os.makedirs(out_dir, exist_ok=True)
     rows = fetch_kad(kad, prefectures=prefectures, api_key=api_key,
                      primary_only=primary_only, exclude=exclude,
-                     progress=progress, should_stop=should_stop)
+                     progress=progress, should_stop=should_stop,
+                     on_progress=on_progress)
     path = os.path.join(out_dir, f"GEMH_{kad}_ana_Nomo.xlsx")
     build_xlsx(rows, path)
     return path, rows

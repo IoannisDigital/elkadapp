@@ -53,8 +53,16 @@ class App(tk.Tk):
     # ---------------- UI ----------------
     def _build_ui(self):
         pad = dict(padx=8, pady=6)
+
+        # Μεγαλύτερο, εμφανές στυλ για το κουμπί έναρξης
+        style = ttk.Style(self)
+        try:
+            style.configure("Start.TButton", font=("", 12, "bold"), padding=8)
+        except Exception:
+            pass
+
         top = ttk.Frame(self)
-        top.pack(fill="x", **pad)
+        top.pack(side="top", fill="x", **pad)
 
         ttk.Label(top, text="API key:").pack(side="left")
         self.api_var = tk.StringVar(value=core.get_api_key())
@@ -64,8 +72,37 @@ class App(tk.Tk):
         ttk.Checkbutton(top, text="Μόνο Κύρια δραστηριότητα (καθαρή λίστα)",
                         variable=self.primary_var).pack(side="left", padx=12)
 
+        # ----- Κάτω μπάρα ενεργειών + προόδου (καρφωμένη κάτω, πάντα ορατή) -----
+        actions = ttk.Frame(self)
+        actions.pack(side="bottom", fill="x", **pad)
+
+        brow = ttk.Frame(actions)
+        brow.pack(fill="x")
+        self.run_btn = ttk.Button(brow, text="▶  ΕΝΑΡΞΗ ΕΞΑΓΩΓΗΣ",
+                                  style="Start.TButton", command=self.start_export)
+        self.run_btn.pack(side="left")
+        self.stop_btn = ttk.Button(brow, text="■ Ακύρωση", command=self.cancel_export,
+                                  state="disabled")
+        self.stop_btn.pack(side="left", padx=6)
+        ttk.Button(brow, text="📂 Άνοιγμα φακέλου output",
+                   command=self.open_output).pack(side="left", padx=6)
+
+        prow = ttk.Frame(actions)
+        prow.pack(fill="x", pady=(6, 0))
+        self.progress = ttk.Progressbar(prow, mode="determinate", maximum=100)
+        self.progress.pack(side="left", fill="x", expand=True)
+        self.pct_var = tk.StringVar(value="0%")
+        ttk.Label(prow, textvariable=self.pct_var, width=6,
+                  anchor="e").pack(side="left", padx=(8, 0))
+        self.status_var = tk.StringVar(value="Έτοιμο.")
+        ttk.Label(actions, textvariable=self.status_var, anchor="w").pack(
+            fill="x", pady=(4, 0))
+
+        self.log = tk.Text(actions, height=8, wrap="word", state="disabled")
+        self.log.pack(fill="x", pady=(6, 0))
+
         body = ttk.Panedwindow(self, orient="horizontal")
-        body.pack(fill="both", expand=True, **pad)
+        body.pack(side="top", fill="both", expand=True, **pad)
 
         # ----- Αριστερά: αναζήτηση & επιλογή ΚΑΔ -----
         left = ttk.Labelframe(body, text="1) ΚΑΔ")
@@ -139,25 +176,6 @@ class App(tk.Tk):
         self.pref_list.pack(side="left", fill="both", expand=True)
         psb.pack(side="right", fill="y")
         self.pref_list.configure(state="disabled")
-
-        # ----- Κάτω: ενέργειες & log -----
-        bottom = ttk.Frame(self)
-        bottom.pack(fill="both", expand=False, **pad)
-
-        brow = ttk.Frame(bottom)
-        brow.pack(fill="x")
-        self.run_btn = ttk.Button(brow, text="▶ Εξαγωγή σε Excel", command=self.start_export)
-        self.run_btn.pack(side="left")
-        self.stop_btn = ttk.Button(brow, text="■ Ακύρωση", command=self.cancel_export,
-                                  state="disabled")
-        self.stop_btn.pack(side="left", padx=6)
-        ttk.Button(brow, text="📂 Άνοιγμα φακέλου output", command=self.open_output).pack(
-            side="left", padx=6)
-        self.status_var = tk.StringVar(value="Έτοιμο.")
-        ttk.Label(brow, textvariable=self.status_var).pack(side="right")
-
-        self.log = tk.Text(bottom, height=11, wrap="word", state="disabled")
-        self.log.pack(fill="both", expand=True, pady=(6, 0))
 
     # ---------------- ενέργειες ----------------
     def _toggle_all_pref(self):
@@ -248,6 +266,7 @@ class App(tk.Tk):
         self.stop_flag.clear()
         self.run_btn.configure(state="disabled")
         self.stop_btn.configure(state="normal")
+        self.msg_q.put(("percent", 0.0))
         self.log_msg("=" * 60)
         self.log_msg(f"Έναρξη εξαγωγής: {len(kads)} ΚΑΔ | Νομοί: "
                      f"{'ΟΛΗ η Ελλάδα' if prefs == 'ALL' else ', '.join(prefs)}")
@@ -260,18 +279,28 @@ class App(tk.Tk):
         def should_stop():
             return self.stop_flag.is_set()
 
+        n = len(kads)
+
         def work():
             done = []
-            for kad in kads:
+            for idx, kad in enumerate(kads):
                 if self.stop_flag.is_set():
                     break
-                self.msg_q.put(("status", f"ΚΑΔ {kad}…"))
+                self.msg_q.put(("status", f"ΚΑΔ {kad}  ({idx + 1}/{n})…"))
                 self.msg_q.put(("log", f"\n== ΚΑΔ {kad} =="))
+
+                def on_prog(scanned, total, _idx=idx):
+                    frac = (scanned / total) if total else 0.0
+                    overall = (_idx + min(frac, 1.0)) / n * 100.0
+                    self.msg_q.put(("percent", overall))
+
                 try:
                     path, rows = core.export_kad(
                         kad, prefectures=prefs, out_dir="output", api_key=api_key,
-                        primary_only=primary, progress=prog, should_stop=should_stop)
+                        primary_only=primary, progress=prog, should_stop=should_stop,
+                        on_progress=on_prog)
                     self.msg_q.put(("kad_done", (kad, path, rows)))
+                    self.msg_q.put(("percent", (idx + 1) / n * 100.0))
                     done.append((kad, path, rows))
                 except Exception as e:
                     self.msg_q.put(("log", f"  ΣΦΑΛΜΑ στον ΚΑΔ {kad}: {e}"))
@@ -303,6 +332,10 @@ class App(tk.Tk):
                     self.log_msg(payload)
                 elif kind == "status":
                     self.status_var.set(payload)
+                elif kind == "percent":
+                    pct = max(0.0, min(100.0, float(payload)))
+                    self.progress["value"] = pct
+                    self.pct_var.set(f"{pct:.0f}%")
                 elif kind == "error":
                     self.log_msg(payload)
                     self.status_var.set("Σφάλμα.")
@@ -316,6 +349,9 @@ class App(tk.Tk):
                     self.run_btn.configure(state="normal")
                     self.stop_btn.configure(state="disabled")
                     n = len(payload)
+                    if not self.stop_flag.is_set():
+                        self.progress["value"] = 100
+                        self.pct_var.set("100%")
                     self.status_var.set(f"Ολοκληρώθηκε: {n} αρχείο(α) στο output/.")
                     self.log_msg(f"\nΟλοκληρώθηκε. Δημιουργήθηκαν {n} αρχείο(α) στον "
                                  f"φάκελο output/.")
