@@ -302,10 +302,31 @@ class App(tk.Tk):
         ttk.Button(srow, text="Ψάξε", style="Accent.TButton",
                    command=self.do_search).pack(side="left")
 
-        ttk.Label(left, text="Αποτελέσματα (διπλό κλικ ή «Προσθήκη» για επιλογή):",
-                  background=CARD, foreground=MUTED).pack(anchor="w", padx=6)
+        # --- Κάτω ομάδα: «Επιλεγμένοι ΚΑΔ» + Αφαίρεση, καρφωμένη στο κάτω μέρος ---
+        ttk.Button(left, text="➖ Αφαίρεση επιλεγμένου", style="Ghost.TButton",
+                   command=self.remove_selected).pack(side="bottom", anchor="w",
+                                                       padx=6, pady=(0, 6))
+        sel_wrap = ttk.Frame(left, style="Card.TFrame")
+        sel_wrap.pack(side="bottom", fill="x", padx=6, pady=(0, 4))
+        self.chosen = ttk.Treeview(sel_wrap, columns=("id", "descr"), show="headings",
+                                  height=5, selectmode="extended")
+        self.chosen.heading("id", text="ΚΑΔ")
+        self.chosen.heading("descr", text="Περιγραφή")
+        self.chosen.column("id", width=100, anchor="w", stretch=False)
+        self.chosen.column("descr", width=380, anchor="w")
+        csb = ttk.Scrollbar(sel_wrap, orient="vertical", command=self.chosen.yview)
+        self.chosen.configure(yscrollcommand=csb.set)
+        self.chosen.pack(side="left", fill="x", expand=True)
+        csb.pack(side="right", fill="y")
+        ttk.Label(left, text="Επιλεγμένοι ΚΑΔ προς εξαγωγή (1 Excel ανά ΚΑΔ):",
+                  background=CARD, foreground=MUTED).pack(side="bottom", anchor="w",
+                                                          padx=6)
+
+        # --- Πάνω ομάδα: αποτελέσματα (μεγαλώνει) + κουμπί Προσθήκης ακριβώς από κάτω ---
+        ttk.Label(left, text="Αποτελέσματα (κλικ για επιλογή, μετά «➕ Προσθήκη» ή «Έναρξη»):",
+                  background=CARD, foreground=MUTED).pack(side="top", anchor="w", padx=6)
         res_wrap = ttk.Frame(left)
-        res_wrap.pack(fill="both", expand=True, padx=6, pady=(0, 6))
+        res_wrap.pack(side="top", fill="both", expand=True, padx=6, pady=(0, 6))
         self.results = ttk.Treeview(res_wrap, columns=("id", "descr"), show="headings",
                                     height=10, selectmode="extended")
         self.results.heading("id", text="ΚΑΔ")
@@ -319,28 +340,11 @@ class App(tk.Tk):
         self.results.bind("<Double-1>", lambda e: self.add_selected())
 
         arow = ttk.Frame(left, style="Card.TFrame")
-        arow.pack(fill="x", padx=6, pady=(0, 6))
+        arow.pack(side="top", fill="x", padx=6, pady=(0, 6))
         ttk.Button(arow, text="➕ Προσθήκη στην εξαγωγή", style="Accent.TButton",
                    command=self.add_selected).pack(side="left")
         ttk.Button(arow, text="Προσθήκη με κωδικό…", style="Ghost.TButton",
                    command=self.add_manual).pack(side="left", padx=6)
-
-        ttk.Label(left, text="Επιλεγμένοι ΚΑΔ προς εξαγωγή (1 Excel ανά ΚΑΔ):",
-                  background=CARD, foreground=MUTED).pack(anchor="w", padx=6)
-        sel_wrap = ttk.Frame(left)
-        sel_wrap.pack(fill="both", expand=True, padx=6, pady=(0, 6))
-        self.chosen = ttk.Treeview(sel_wrap, columns=("id", "descr"), show="headings",
-                                  height=6, selectmode="extended")
-        self.chosen.heading("id", text="ΚΑΔ")
-        self.chosen.heading("descr", text="Περιγραφή")
-        self.chosen.column("id", width=100, anchor="w", stretch=False)
-        self.chosen.column("descr", width=380, anchor="w")
-        csb = ttk.Scrollbar(sel_wrap, orient="vertical", command=self.chosen.yview)
-        self.chosen.configure(yscrollcommand=csb.set)
-        self.chosen.pack(side="left", fill="both", expand=True)
-        csb.pack(side="right", fill="y")
-        ttk.Button(left, text="➖ Αφαίρεση επιλεγμένου", style="Ghost.TButton",
-                   command=self.remove_selected).pack(anchor="w", padx=6, pady=(0, 6))
 
         # ----- Δεξιά: νομοί -----
         right = ttk.Labelframe(body, text="2) Νομοί", style="Card.TLabelframe")
