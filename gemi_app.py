@@ -58,9 +58,12 @@ GREEN_DK = "#1B5E20"
 RED = "#B3261E"       # κουμπί ακύρωσης
 RED_DK = "#7F1710"
 BG = "#EEF2F8"        # φόντο εφαρμογής
-CARD = "#FFFFFF"      # φόντο πινάκων
+CARD = "#FFFFFF"      # φόντο πινάκων/καρτών
 INK = "#1B2430"       # κείμενο
 MUTED = "#5B6472"     # δευτερεύον κείμενο
+BORDER = "#E2E7F0"    # λεπτό περίγραμμα καρτών
+STRIPE = "#F5F8FC"    # ζέβρα / επικεφαλίδες
+SEL = "#D7E6FF"       # επιλογή (ανοιχτό μπλε)
 
 
 class App(tk.Tk):
@@ -91,41 +94,54 @@ class App(tk.Tk):
             st.theme_use("clam")
         except Exception:
             pass
-        st.configure(".", background=BG, foreground=INK, font=("Segoe UI", 10))
+        base_font = ("Segoe UI", 10)
+        st.configure(".", background=BG, foreground=INK, font=base_font)
         st.configure("TFrame", background=BG)
         st.configure("Card.TFrame", background=CARD)
         st.configure("TLabel", background=BG, foreground=INK)
         st.configure("Muted.TLabel", background=BG, foreground=MUTED)
-        st.configure("TCheckbutton", background=BG, foreground=INK)
+        st.configure("TCheckbutton", background=CARD, foreground=INK, focuscolor=CARD)
+        st.map("TCheckbutton", background=[("active", CARD)])
         st.configure("Card.TCheckbutton", background=CARD, foreground=INK)
         st.map("Card.TCheckbutton", background=[("active", CARD)])
-        st.configure("Card.TLabelframe", background=CARD, borderwidth=1, relief="solid")
-        st.configure("Card.TLabelframe.Label", background=CARD, foreground=NAVY,
-                     font=("Segoe UI", 10, "bold"))
+
+        # Entry — πιο μοντέρνο, με λεπτό περίγραμμα
+        st.configure("TEntry", fieldbackground="white", bordercolor=BORDER,
+                     lightcolor=BORDER, darkcolor=BORDER, borderwidth=1, padding=5)
+        st.map("TEntry", bordercolor=[("focus", BLUE)])
+
+        # Treeview — flat, ζέβρα, μοντέρνες επικεφαλίδες
         st.configure("Treeview", background=CARD, fieldbackground=CARD, foreground=INK,
-                     rowheight=22, borderwidth=0)
-        st.configure("Treeview.Heading", background=NAVY, foreground="white",
-                     font=("Segoe UI", 9, "bold"))
-        st.map("Treeview.Heading", background=[("active", NAVY)])
-        st.map("Treeview", background=[("selected", NAVY)], foreground=[("selected", "white")])
+                     rowheight=28, borderwidth=0, font=base_font)
+        st.configure("Treeview.Heading", background=STRIPE, foreground=NAVY,
+                     font=("Segoe UI", 9, "bold"), relief="flat", borderwidth=0,
+                     padding=(8, 6))
+        st.map("Treeview.Heading", background=[("active", "#E7EDF6")])
+        st.map("Treeview", background=[("selected", SEL)], foreground=[("selected", INK)])
+
+        # Scrollbar — λεπτό
+        st.configure("Vertical.TScrollbar", background="#CBD5E6", troughcolor=BG,
+                     borderwidth=0, arrowsize=12)
 
         # Κουμπιά
-        st.configure("Start.TButton", font=("Segoe UI", 12, "bold"), padding=(16, 10),
-                     background=GREEN, foreground="white", borderwidth=0)
-        st.map("Start.TButton", background=[("active", GREEN_DK), ("disabled", "#9AA6B2")])
-        st.configure("Stop.TButton", font=("Segoe UI", 10, "bold"), padding=(12, 8),
-                     background=RED, foreground="white", borderwidth=0)
-        st.map("Stop.TButton", background=[("active", RED_DK), ("disabled", "#C9B7B5")])
-        st.configure("Ghost.TButton", font=("Segoe UI", 10), padding=(12, 8),
-                     background="#D7DEEA", foreground=NAVY, borderwidth=0)
-        st.map("Ghost.TButton", background=[("active", "#C3CEE0")])
-        st.configure("Accent.TButton", font=("Segoe UI", 9, "bold"), padding=(10, 5),
-                     background=NAVY, foreground="white", borderwidth=0)
-        st.map("Accent.TButton", background=[("active", BLUE_DK)])
+        st.configure("Start.TButton", font=("Segoe UI", 13, "bold"), padding=(18, 12),
+                     background=GREEN, foreground="white", borderwidth=0, focuscolor=GREEN)
+        st.map("Start.TButton", background=[("active", GREEN_DK), ("pressed", GREEN_DK),
+                                            ("disabled", "#A7B2BF")])
+        st.configure("Stop.TButton", font=("Segoe UI", 10, "bold"), padding=(14, 10),
+                     background=RED, foreground="white", borderwidth=0, focuscolor=RED)
+        st.map("Stop.TButton", background=[("active", RED_DK), ("disabled", "#CBB9B7")])
+        st.configure("Ghost.TButton", font=("Segoe UI", 10), padding=(12, 9),
+                     background="#E6ECF5", foreground=NAVY, borderwidth=0,
+                     focuscolor="#E6ECF5")
+        st.map("Ghost.TButton", background=[("active", "#D6E0EE")])
+        st.configure("Accent.TButton", font=("Segoe UI", 10, "bold"), padding=(14, 8),
+                     background=BLUE, foreground="white", borderwidth=0, focuscolor=BLUE)
+        st.map("Accent.TButton", background=[("active", BLUE_DK), ("pressed", BLUE_DK)])
 
-        # Μπάρα προόδου
-        st.configure("Brand.Horizontal.TProgressbar", troughcolor="#D7DEEA",
-                     background=GOLD, thickness=22, borderwidth=0)
+        # Μπάρα προόδου — λεπτή, μοντέρνα
+        st.configure("Brand.Horizontal.TProgressbar", troughcolor="#DCE3EF",
+                     background=BLUE, thickness=14, borderwidth=0)
 
     # ---------------- Logo έμβλημα: κίονας + βέλος ανάπτυξης (brand) ----------------
     def _draw_logo(self, cv, x, y, s):
@@ -230,6 +246,17 @@ class App(tk.Tk):
         # μπλε γραμμή-τόνος κάτω από το header
         tk.Frame(self, bg=BLUE, height=3).pack(side="top", fill="x")
 
+    def _make_card(self, parent, title):
+        """Επίπεδη «κάρτα» με λεπτό περίγραμμα και τίτλο (αντί για grooved Labelframe)."""
+        card = tk.Frame(parent, bg=CARD, highlightbackground=BORDER,
+                        highlightthickness=1)
+        head = tk.Frame(card, bg=CARD)
+        head.pack(fill="x", padx=12, pady=(10, 6))
+        tk.Frame(head, bg=BLUE, width=4, height=16).pack(side="left", padx=(0, 8))
+        tk.Label(head, text=title, bg=CARD, fg=NAVY,
+                 font=("Segoe UI", 11, "bold")).pack(side="left")
+        return card
+
     # ---------------- UI ----------------
     def _build_ui(self):
         pad = dict(padx=10, pady=6)
@@ -288,9 +315,11 @@ class App(tk.Tk):
         body = ttk.Panedwindow(self, orient="horizontal")
         body.pack(side="top", fill="both", expand=True, **pad)
 
-        # ----- Αριστερά: αναζήτηση & επιλογή ΚΑΔ -----
-        left = ttk.Labelframe(body, text="1) ΚΑΔ", style="Card.TLabelframe")
-        body.add(left, weight=3)
+        # ----- Αριστερά: αναζήτηση & επιλογή ΚΑΔ (flat card) -----
+        left_card = self._make_card(body, "1  ·  Επιλογή ΚΑΔ")
+        body.add(left_card, weight=3)
+        left = tk.Frame(left_card, bg=CARD)
+        left.pack(fill="both", expand=True, padx=12, pady=(0, 10))
 
         # Grid layout: μόνο η λίστα αποτελεσμάτων (row 2) μεγαλώνει· οι
         # επιλεγμένοι ΚΑΔ φαίνονται σε μία γραμμή (row 4), χωρίς δεύτερη λίστα.
@@ -344,23 +373,27 @@ class App(tk.Tk):
                   font=("Segoe UI", 9, "bold"), wraplength=520, justify="left").grid(
             row=4, column=0, sticky="w", padx=6, pady=(0, 8))
 
-        # ----- Δεξιά: νομοί -----
-        right = ttk.Labelframe(body, text="2) Νομοί", style="Card.TLabelframe")
-        body.add(right, weight=2)
+        # ----- Δεξιά: νομοί (flat card) -----
+        right_card = self._make_card(body, "2  ·  Νομοί")
+        body.add(right_card, weight=2)
+        right = tk.Frame(right_card, bg=CARD)
+        right.pack(fill="both", expand=True, padx=12, pady=(0, 10))
         self.all_pref_var = tk.BooleanVar(value=True)
         cb = ttk.Checkbutton(right, text="ΟΛΗ η Ελλάδα (όλοι οι νομοί)",
-                             variable=self.all_pref_var, command=self._toggle_all_pref)
-        cb.configure(style="Card.TCheckbutton")
-        cb.pack(anchor="w", padx=8, pady=6)
+                             variable=self.all_pref_var, command=self._toggle_all_pref,
+                             style="Card.TCheckbutton")
+        cb.pack(anchor="w", pady=(0, 6))
         ttk.Label(right, text="ή διάλεξε συγκεκριμένους (Ctrl/Shift για πολλαπλή):",
-                  background=CARD, foreground=MUTED).pack(anchor="w", padx=8)
-        pf_wrap = ttk.Frame(right, style="Card.TFrame")
-        pf_wrap.pack(fill="both", expand=True, padx=8, pady=(0, 6))
+                  background=CARD, foreground=MUTED).pack(anchor="w")
+        pf_wrap = tk.Frame(right, bg=CARD, highlightbackground=BORDER,
+                           highlightthickness=1)
+        pf_wrap.pack(fill="both", expand=True, pady=(4, 0))
         self.pref_list = tk.Listbox(pf_wrap, selectmode="extended", exportselection=False,
-                                    bg=CARD, fg=INK, selectbackground=NAVY,
-                                    selectforeground="white", highlightthickness=1,
-                                    highlightbackground="#C7D0DE", relief="flat",
-                                    disabledforeground="#9AA6B2", activestyle="none")
+                                    bg=CARD, fg=INK, selectbackground=SEL,
+                                    selectforeground=INK, highlightthickness=0,
+                                    borderwidth=0, relief="flat",
+                                    disabledforeground="#9AA6B2", activestyle="none",
+                                    font=("Segoe UI", 10))
         for name in core.PREF_NAMES:
             self.pref_list.insert("end", name)
         psb = ttk.Scrollbar(pf_wrap, orient="vertical", command=self.pref_list.yview)
@@ -439,8 +472,11 @@ class App(tk.Tk):
 
     def _fill_results(self, hits):
         self.results.delete(*self.results.get_children())
-        for a in hits:
-            self.results.insert("", "end", values=(a.get("id"), a.get("descr")))
+        self.results.tag_configure("odd", background=STRIPE)
+        self.results.tag_configure("even", background=CARD)
+        for i, a in enumerate(hits):
+            self.results.insert("", "end", values=(a.get("id"), a.get("descr")),
+                                tags=("odd" if i % 2 else "even",))
         total = len(self.all_activities)
         if total and len(hits) != total:
             self.status_var.set(f"{len(hits)} από {total} ΚΑΔ (φίλτρο).")
@@ -551,7 +587,7 @@ class App(tk.Tk):
                     path, rows = core.export_kad(
                         kad, prefectures=prefs, out_dir=self.out_dir, api_key=api_key,
                         primary_only=primary, progress=prog, should_stop=should_stop,
-                        on_progress=on_prog)
+                        on_progress=on_prog, label=self.selected_kads.get(kad, ""))
                     self.msg_q.put(("kad_done", (kad, path, rows)))
                     self.msg_q.put(("percent", (idx + 1) / n * 100.0))
                     done.append((kad, path, rows))

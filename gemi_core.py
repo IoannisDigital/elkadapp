@@ -56,6 +56,34 @@ def strip_acc(s):
     return "".join(c for c in s if unicodedata.category(c) != "Mn").upper()
 
 
+# Ελληνικά -> Λατινικά (για ονόματα αρχείων)
+_GR2LAT = {
+    "Α": "A", "Β": "V", "Γ": "G", "Δ": "D", "Ε": "E", "Ζ": "Z", "Η": "I",
+    "Θ": "TH", "Ι": "I", "Κ": "K", "Λ": "L", "Μ": "M", "Ν": "N", "Ξ": "X",
+    "Ο": "O", "Π": "P", "Ρ": "R", "Σ": "S", "Τ": "T", "Υ": "Y", "Φ": "F",
+    "Χ": "CH", "Ψ": "PS", "Ω": "O", "Ϊ": "I", "Ϋ": "Y",
+}
+
+
+def latin_slug(text, max_len=40, max_words=5):
+    """
+    Μετατρέπει ελληνικό κείμενο σε λατινικό slug για όνομα αρχείου
+    (π.χ. 'ΛΙΑΝΙΚΟ ΕΜΠΟΡΙΟ ΦΑΡΜΑΚΩΝ' -> 'LIANIKO_EMPORIO_FARMAKON').
+    """
+    up = strip_acc(text)  # κεφαλαία, χωρίς τόνους
+    out = []
+    for ch in up:
+        if ch in _GR2LAT:
+            out.append(_GR2LAT[ch])
+        elif ch.isascii() and ch.isalnum():
+            out.append(ch)
+        else:
+            out.append(" ")
+    words = "".join(out).split()
+    slug = "_".join(words[:max_words])[:max_len].strip("_")
+    return slug
+
+
 def get_api_key():
     """Επιστρέφει το API key από env var GEMI_API_KEY, αλλιώς το default."""
     return os.environ.get("GEMI_API_KEY", DEFAULT_API_KEY).strip()
@@ -267,9 +295,10 @@ def build_xlsx(rows, path):
 
 def export_kad(kad, prefectures="ALL", out_dir="output", api_key=None,
                primary_only=True, exclude=None, progress=None, should_stop=None,
-               on_progress=None):
+               on_progress=None, label=None):
     """
     Αντλεί έναν ΚΑΔ και γράφει το αντίστοιχο .xlsx.
+    label: περιγραφή ΚΑΔ (ελληνικά) — μπαίνει στο όνομα αρχείου ως λατινικό slug.
     Επιστρέφει (path, rows).
     """
     os.makedirs(out_dir, exist_ok=True)
@@ -277,6 +306,8 @@ def export_kad(kad, prefectures="ALL", out_dir="output", api_key=None,
                      primary_only=primary_only, exclude=exclude,
                      progress=progress, should_stop=should_stop,
                      on_progress=on_progress)
-    path = os.path.join(out_dir, f"GEMH_{kad}_ana_Nomo.xlsx")
+    slug = latin_slug(label) if label else ""
+    name = f"GEMH_{kad}_{slug}_ana_Nomo.xlsx" if slug else f"GEMH_{kad}_ana_Nomo.xlsx"
+    path = os.path.join(out_dir, name)
     build_xlsx(rows, path)
     return path, rows
