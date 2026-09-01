@@ -464,9 +464,18 @@ class App(tk.Tk):
     def start_export(self):
         if self.worker and self.worker.is_alive():
             return
+        # Αν δεν έχει προστεθεί τίποτα στην κάτω λίστα αλλά υπάρχουν
+        # μαρκαρισμένες γραμμές στα αποτελέσματα, πρόσθεσέ τες αυτόματα.
+        if not self.selected_kads and self.results.selection():
+            self.add_selected()
         kads = list(self.selected_kads.keys())
         if not kads:
-            messagebox.showwarning("Προσοχή", "Δεν έχεις επιλέξει κανέναν ΚΑΔ.")
+            messagebox.showwarning(
+                "Προσοχή",
+                "Δεν έχεις επιλέξει κανέναν ΚΑΔ.\n\n"
+                "Διάλεξε έναν ή περισσότερους ΚΑΔ από τη λίστα «Αποτελέσματα» "
+                "(κλικ πάνω τους) και πάτα «➕ Προσθήκη στην εξαγωγή» — "
+                "ή απλώς μαρκάρισέ τους και ξαναπάτα «Έναρξη».")
             return
         prefs = self._chosen_prefectures()
         api_key = self.api_var.get().strip()
