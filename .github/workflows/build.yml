@@ -21,13 +21,10 @@ jobs:
         include:
           - os: windows-latest
             artifact: GEMI-Elkad-Windows
-            addflags: "--add-data assets;assets"
           - os: macos-latest
             artifact: GEMI-Elkad-macOS
-            addflags: "--add-data assets:assets"
           - os: ubuntu-latest
             artifact: GEMI-Elkad-Linux
-            addflags: "--add-data assets:assets"
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -46,7 +43,7 @@ jobs:
           pip install -r requirements.txt pyinstaller
 
       - name: Build executable
-        run: pyinstaller --onefile --windowed --name GEMI-Elkad ${{ matrix.addflags }} gemi_app.py
+        run: pyinstaller GEMI-Elkad.spec
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
