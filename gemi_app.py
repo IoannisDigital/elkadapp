@@ -67,8 +67,8 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title(f"{BRAND} — {APP_NAME}")
-        self.geometry("1040x720")
-        self.minsize(900, 620)
+        self.geometry("1080x860")
+        self.minsize(980, 780)
         self.configure(bg=BG)
 
         self.msg_q = queue.Queue()
@@ -292,8 +292,14 @@ class App(tk.Tk):
         left = ttk.Labelframe(body, text="1) ΚΑΔ", style="Card.TLabelframe")
         body.add(left, weight=3)
 
+        # Grid layout: η γραμμή των αποτελεσμάτων (row 2) μεγαλώνει· όλα τα
+        # υπόλοιπα (κουμπιά, επιλεγμένοι) έχουν σταθερή θέση και είναι πάντα ορατά.
+        left.columnconfigure(0, weight=1)
+        left.rowconfigure(2, weight=1)
+
+        # row 0: αναζήτηση
         srow = ttk.Frame(left, style="Card.TFrame")
-        srow.pack(fill="x", padx=6, pady=6)
+        srow.grid(row=0, column=0, sticky="ew", padx=6, pady=6)
         ttk.Label(srow, text="Αναζήτηση:", background=CARD).pack(side="left")
         self.search_var = tk.StringVar()
         self.search_var.trace_add("write", lambda *a: self._filter_local())
@@ -303,33 +309,15 @@ class App(tk.Tk):
         ttk.Button(srow, text="Ψάξε", style="Accent.TButton",
                    command=self.do_search).pack(side="left")
 
-        # --- Κάτω ομάδα: «Επιλεγμένοι ΚΑΔ» + Αφαίρεση, καρφωμένη στο κάτω μέρος ---
-        ttk.Button(left, text="➖ Αφαίρεση επιλεγμένου", style="Ghost.TButton",
-                   command=self.remove_selected).pack(side="bottom", anchor="w",
-                                                       padx=6, pady=(0, 6))
-        sel_wrap = ttk.Frame(left, style="Card.TFrame")
-        sel_wrap.pack(side="bottom", fill="x", padx=6, pady=(0, 4))
-        self.chosen = ttk.Treeview(sel_wrap, columns=("id", "descr"), show="headings",
-                                  height=5, selectmode="extended")
-        self.chosen.heading("id", text="ΚΑΔ")
-        self.chosen.heading("descr", text="Περιγραφή")
-        self.chosen.column("id", width=100, anchor="w", stretch=False)
-        self.chosen.column("descr", width=380, anchor="w")
-        csb = ttk.Scrollbar(sel_wrap, orient="vertical", command=self.chosen.yview)
-        self.chosen.configure(yscrollcommand=csb.set)
-        self.chosen.pack(side="left", fill="x", expand=True)
-        csb.pack(side="right", fill="y")
-        ttk.Label(left, text="Επιλεγμένοι ΚΑΔ προς εξαγωγή (1 Excel ανά ΚΑΔ):",
-                  background=CARD, foreground=MUTED).pack(side="bottom", anchor="w",
-                                                          padx=6)
-
-        # --- Πάνω ομάδα: αποτελέσματα (μεγαλώνει) + κουμπί Προσθήκης ακριβώς από κάτω ---
+        # row 1: ετικέτα αποτελεσμάτων
         ttk.Label(left, text="Αποτελέσματα (κλικ για επιλογή, μετά «➕ Προσθήκη» ή «Έναρξη»):",
-                  background=CARD, foreground=MUTED).pack(side="top", anchor="w", padx=6)
+                  background=CARD, foreground=MUTED).grid(row=1, column=0, sticky="w",
+                                                          padx=6)
+        # row 2: λίστα αποτελεσμάτων (μεγαλώνει)
         res_wrap = ttk.Frame(left)
-        res_wrap.pack(side="top", fill="both", expand=True, padx=6, pady=(0, 6))
+        res_wrap.grid(row=2, column=0, sticky="nsew", padx=6, pady=(0, 6))
         self.results = ttk.Treeview(res_wrap, columns=("id", "descr"), show="headings",
-                                    height=10, selectmode="extended")
+                                    height=8, selectmode="extended")
         self.results.heading("id", text="ΚΑΔ")
         self.results.heading("descr", text="Περιγραφή")
         self.results.column("id", width=100, anchor="w", stretch=False)
@@ -340,12 +328,36 @@ class App(tk.Tk):
         rsb.pack(side="right", fill="y")
         self.results.bind("<Double-1>", lambda e: self.add_selected())
 
+        # row 3: κουμπιά προσθήκης
         arow = ttk.Frame(left, style="Card.TFrame")
-        arow.pack(side="top", fill="x", padx=6, pady=(0, 6))
+        arow.grid(row=3, column=0, sticky="ew", padx=6, pady=(0, 6))
         ttk.Button(arow, text="➕ Προσθήκη στην εξαγωγή", style="Accent.TButton",
                    command=self.add_selected).pack(side="left")
         ttk.Button(arow, text="Προσθήκη με κωδικό…", style="Ghost.TButton",
                    command=self.add_manual).pack(side="left", padx=6)
+
+        # row 4: ετικέτα επιλεγμένων
+        ttk.Label(left, text="Επιλεγμένοι ΚΑΔ προς εξαγωγή (1 Excel ανά ΚΑΔ):",
+                  background=CARD, foreground=MUTED).grid(row=4, column=0, sticky="w",
+                                                          padx=6)
+        # row 5: λίστα επιλεγμένων (σταθερό ύψος)
+        sel_wrap = ttk.Frame(left, style="Card.TFrame")
+        sel_wrap.grid(row=5, column=0, sticky="ew", padx=6, pady=(0, 4))
+        self.chosen = ttk.Treeview(sel_wrap, columns=("id", "descr"), show="headings",
+                                  height=4, selectmode="extended")
+        self.chosen.heading("id", text="ΚΑΔ")
+        self.chosen.heading("descr", text="Περιγραφή")
+        self.chosen.column("id", width=100, anchor="w", stretch=False)
+        self.chosen.column("descr", width=380, anchor="w")
+        csb = ttk.Scrollbar(sel_wrap, orient="vertical", command=self.chosen.yview)
+        self.chosen.configure(yscrollcommand=csb.set)
+        self.chosen.pack(side="left", fill="x", expand=True)
+        csb.pack(side="right", fill="y")
+
+        # row 6: αφαίρεση
+        ttk.Button(left, text="➖ Αφαίρεση επιλεγμένου", style="Ghost.TButton",
+                   command=self.remove_selected).grid(row=6, column=0, sticky="w",
+                                                      padx=6, pady=(0, 6))
 
         # ----- Δεξιά: νομοί -----
         right = ttk.Labelframe(body, text="2) Νομοί", style="Card.TLabelframe")
