@@ -21,13 +21,13 @@ jobs:
         include:
           - os: windows-latest
             artifact: GEMI-Elkad-Windows
-            addflags: ""
+            addflags: "--add-data assets;assets"
           - os: macos-latest
             artifact: GEMI-Elkad-macOS
-            addflags: ""
+            addflags: "--add-data assets:assets"
           - os: ubuntu-latest
             artifact: GEMI-Elkad-Linux
-            addflags: ""
+            addflags: "--add-data assets:assets"
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

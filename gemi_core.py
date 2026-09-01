@@ -8,6 +8,7 @@
 """
 import os
 import time
+import unicodedata
 
 import requests
 from openpyxl import Workbook
@@ -45,6 +46,15 @@ PREF_NAMES = sorted(PREF_MAP.keys())
 HDR = ["Επωνυμία", "ΑΦΜ", "Διεύθυνση", "Πόλη", "ΤΚ", "Νομός", "Τηλέφωνο", "Email", "Website"]
 NAVY = "1F3864"
 
+# Τρέχουσα ταξινομία ΚΑΔ (το API επιστρέφει και παλιές εκδόσεις).
+KAD_VERSION = "kad_2026"
+
+
+def strip_acc(s):
+    """Πεζά/κεφαλαία χωρίς τόνους — για ανεκτική αναζήτηση (π.χ. ΚΟΜΜΩΤΗΡ)."""
+    s = unicodedata.normalize("NFD", s or "")
+    return "".join(c for c in s if unicodedata.category(c) != "Mn").upper()
+
 
 def get_api_key():
     """Επιστρέφει το API key από env var GEMI_API_KEY, αλλιώς το default."""
@@ -57,19 +67,32 @@ def session(api_key=None):
     return s
 
 
-def list_activities(api_key=None):
-    """Επιστρέφει τη λίστα όλων των ΚΑΔ (metadata/activities)."""
+def list_activities(api_key=None, current_only=True):
+    """
+    Επιστρέφει τη λίστα ΚΑΔ (metadata/activities).
+    current_only=True: μόνο η τρέχουσα ταξινομία (kad_2026), ώστε να μην
+    εμφανίζονται παλιοί κωδικοί που δεν δουλεύουν πια.
+    """
     s = session(api_key)
     r = s.get(f"{BASE}/metadata/activities", timeout=60)
     r.raise_for_status()
-    return r.json()
+    data = r.json()
+    if current_only:
+        cur = [a for a in data if a.get("kadVersion") == KAD_VERSION]
+        if cur:  # ασφάλεια: αν αλλάξει το ταξινομικό όνομα, μη μείνει κενό
+            data = cur
+    return sorted(data, key=lambda x: str(x.get("id", "")))
 
 
-def search_activities(keyword, api_key=None):
-    """Επιστρέφει τους ΚΑΔ των οποίων η περιγραφή περιέχει τη λέξη-κλειδί."""
-    kw = (keyword or "").upper()
-    hits = [a for a in list_activities(api_key) if kw in (a.get("descr", "") or "").upper()]
-    return sorted(hits, key=lambda x: str(x.get("id", "")))
+def search_activities(keyword, api_key=None, current_only=True):
+    """
+    Επιστρέφει τους ΚΑΔ των οποίων η περιγραφή περιέχει τη λέξη-κλειδί,
+    αγνοώντας τόνους και πεζά/κεφαλαία. Κενή λέξη -> όλος ο κατάλογος.
+    """
+    kw = strip_acc(keyword)
+    acts = list_activities(api_key, current_only=current_only)
+    hits = [a for a in acts if kw in strip_acc(a.get("descr", ""))]
+    return hits
 
 
 def resolve_prefectures(prefectures):

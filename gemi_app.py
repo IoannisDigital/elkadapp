@@ -14,6 +14,7 @@
 Δεν χρειάζεται να πειράξεις καθόλου κώδικα — όλα γίνονται από το παράθυρο.
 """
 import os
+import sys
 import queue
 import threading
 import webbrowser
@@ -22,7 +23,6 @@ try:
     import tkinter as tk
     from tkinter import ttk, messagebox
 except ModuleNotFoundError:
-    import sys
     sys.stderr.write(
         "\nΤο tkinter (γραφικό περιβάλλον) δεν είναι εγκατεστημένο.\n"
         "  • Windows/macOS: επανεγκατέστησε Python από python.org "
@@ -35,31 +35,181 @@ except ModuleNotFoundError:
 import gemi_core as core
 
 
+def resource_path(rel):
+    """Διαδρομή πόρου που δουλεύει και σε PyInstaller (.exe) και σε πηγαίο κώδικα."""
+    base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base, rel)
+
+
+# ---------------- Οπτική ταυτότητα (DMS Hellas) ----------------
+BRAND = "DMS Hellas"
+COMPANY = "Digital Marketing Systems Hellas Ltd"
+APP_NAME = "ΓΕΜΗ Data Extractor"
+MOTTO = "Δημόσια δεδομένα ΓΕΜΗ, έτοιμα για B2B συνεργασίες"
+
+# Χρώματα από το λογότυπο DMS (μπλε / γκρι)
+BLUE = "#1E63D6"      # κύριο μπλε (brand)
+BLUE_DK = "#12356F"   # σκούρο μπλε
+GREY = "#3A3F47"      # ανθρακί (brand)
+NAVY = "#1F3864"      # (επικεφαλίδες Excel — παραμένει)
+GOLD = "#1E63D6"      # τόνος = brand μπλε (μπάρα προόδου)
+GREEN = "#2E7D32"     # κουμπί έναρξης
+GREEN_DK = "#1B5E20"
+RED = "#B3261E"       # κουμπί ακύρωσης
+RED_DK = "#7F1710"
+BG = "#EEF2F8"        # φόντο εφαρμογής
+CARD = "#FFFFFF"      # φόντο πινάκων
+INK = "#1B2430"       # κείμενο
+MUTED = "#5B6472"     # δευτερεύον κείμενο
+
+
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("ΓΕΜΗ OpenData — Εξαγωγή σε Excel ανά ΚΑΔ")
-        self.geometry("1000x680")
-        self.minsize(880, 600)
+        self.title(f"{BRAND} — {APP_NAME}")
+        self.geometry("1040x720")
+        self.minsize(900, 620)
+        self.configure(bg=BG)
 
         self.msg_q = queue.Queue()
         self.worker = None
         self.stop_flag = threading.Event()
         self.selected_kads = {}  # id -> descr
+        self.all_activities = []  # πλήρης κατάλογος ΚΑΔ (cache)
+        self._catalog_loading = False
 
+        self._setup_style()
         self._build_ui()
         self.after(120, self._drain_queue)
+        self.after(300, self.load_catalog)  # αυτόματη φόρτωση καταλόγου ΚΑΔ
+
+    # ---------------- Θέμα / στυλ ----------------
+    def _setup_style(self):
+        st = ttk.Style(self)
+        try:
+            st.theme_use("clam")
+        except Exception:
+            pass
+        st.configure(".", background=BG, foreground=INK, font=("Segoe UI", 10))
+        st.configure("TFrame", background=BG)
+        st.configure("Card.TFrame", background=CARD)
+        st.configure("TLabel", background=BG, foreground=INK)
+        st.configure("Muted.TLabel", background=BG, foreground=MUTED)
+        st.configure("TCheckbutton", background=BG, foreground=INK)
+        st.configure("Card.TCheckbutton", background=CARD, foreground=INK)
+        st.map("Card.TCheckbutton", background=[("active", CARD)])
+        st.configure("Card.TLabelframe", background=CARD, borderwidth=1, relief="solid")
+        st.configure("Card.TLabelframe.Label", background=CARD, foreground=NAVY,
+                     font=("Segoe UI", 10, "bold"))
+        st.configure("Treeview", background=CARD, fieldbackground=CARD, foreground=INK,
+                     rowheight=22, borderwidth=0)
+        st.configure("Treeview.Heading", background=NAVY, foreground="white",
+                     font=("Segoe UI", 9, "bold"))
+        st.map("Treeview.Heading", background=[("active", NAVY)])
+        st.map("Treeview", background=[("selected", NAVY)], foreground=[("selected", "white")])
+
+        # Κουμπιά
+        st.configure("Start.TButton", font=("Segoe UI", 12, "bold"), padding=(16, 10),
+                     background=GREEN, foreground="white", borderwidth=0)
+        st.map("Start.TButton", background=[("active", GREEN_DK), ("disabled", "#9AA6B2")])
+        st.configure("Stop.TButton", font=("Segoe UI", 10, "bold"), padding=(12, 8),
+                     background=RED, foreground="white", borderwidth=0)
+        st.map("Stop.TButton", background=[("active", RED_DK), ("disabled", "#C9B7B5")])
+        st.configure("Ghost.TButton", font=("Segoe UI", 10), padding=(12, 8),
+                     background="#D7DEEA", foreground=NAVY, borderwidth=0)
+        st.map("Ghost.TButton", background=[("active", "#C3CEE0")])
+        st.configure("Accent.TButton", font=("Segoe UI", 9, "bold"), padding=(10, 5),
+                     background=NAVY, foreground="white", borderwidth=0)
+        st.map("Accent.TButton", background=[("active", NAVY_DK)])
+
+        # Μπάρα προόδου
+        st.configure("Brand.Horizontal.TProgressbar", troughcolor="#D7DEEA",
+                     background=GOLD, thickness=22, borderwidth=0)
+
+    # ---------------- Logo έμβλημα: κίονας + βέλος ανάπτυξης (brand) ----------------
+    def _draw_logo(self, cv, x, y, s):
+        blue, grey = BLUE, GREY
+        # Βέλος ανάπτυξης (πίσω, μπλε) — από κάτω-αριστερά προς πάνω-δεξιά
+        cv.create_line(x + s * 0.16, y + s * 0.90, x + s * 0.90, y + s * 0.16,
+                       fill=blue, width=max(3, int(s * 0.09)), capstyle="round")
+        ah = s * 0.16
+        cv.create_polygon(
+            x + s * 0.90, y + s * 0.16,
+            x + s * 0.90 - ah, y + s * 0.20,
+            x + s * 0.86, y + s * 0.16 + ah,
+            fill=blue, outline="")
+        # Κίονας (μπροστά, ανθρακί)
+        cx = x + s * 0.44
+        cap_w = s * 0.46
+        # κιονόκρανο (capital)
+        cv.create_rectangle(cx - cap_w / 2, y + s * 0.18,
+                            cx + cap_w / 2, y + s * 0.27, fill=grey, outline="")
+        cv.create_oval(cx - cap_w / 2 - s * 0.02, y + s * 0.17,
+                       cx - cap_w / 2 + s * 0.10, y + s * 0.27, fill=grey, outline="")
+        cv.create_oval(cx + cap_w / 2 - s * 0.10, y + s * 0.17,
+                       cx + cap_w / 2 + s * 0.02, y + s * 0.27, fill=grey, outline="")
+        # κορμός με ραβδώσεις (shaft)
+        sh_w = s * 0.34
+        cv.create_rectangle(cx - sh_w / 2, y + s * 0.28,
+                            cx + sh_w / 2, y + s * 0.74, fill=grey, outline="")
+        for k in range(1, 4):
+            fx = cx - sh_w / 2 + sh_w * k / 4
+            cv.create_line(fx, y + s * 0.30, fx, y + s * 0.72,
+                           fill="#525863", width=max(1, int(s * 0.015)))
+        # βάση (base)
+        cv.create_rectangle(cx - cap_w / 2, y + s * 0.74,
+                            cx + cap_w / 2, y + s * 0.82, fill=grey, outline="")
+
+    def _load_logo_image(self, target_h):
+        """Αν υπάρχει assets/dms_logo.png, το φορτώνει και κλιμακώνει στο ύψος."""
+        path = resource_path(os.path.join("assets", "dms_logo.png"))
+        if not os.path.exists(path):
+            return None
+        try:
+            img = tk.PhotoImage(file=path)
+            factor = max(1, round(img.height() / target_h))
+            if factor > 1:
+                img = img.subsample(factor, factor)
+            return img
+        except Exception:
+            return None
+
+    def _build_header(self):
+        h = 92
+        header = tk.Frame(self, bg=CARD, height=h)
+        header.pack(side="top", fill="x")
+        header.pack_propagate(False)
+
+        self._logo_img = self._load_logo_image(64)
+        if self._logo_img is not None:
+            tk.Label(header, image=self._logo_img, bg=CARD).pack(
+                side="left", padx=(18, 14), pady=12)
+        else:
+            cv = tk.Canvas(header, width=68, height=68, bg=CARD, highlightthickness=0)
+            cv.pack(side="left", padx=(18, 14), pady=12)
+            self._draw_logo(cv, 2, 2, 64)
+
+        txt = tk.Frame(header, bg=CARD)
+        txt.pack(side="left", pady=14, anchor="w")
+        row = tk.Frame(txt, bg=CARD)
+        row.pack(anchor="w")
+        tk.Label(row, text="DMS", bg=CARD, fg=BLUE,
+                 font=("Segoe UI", 20, "bold")).pack(side="left")
+        tk.Label(row, text=" Hellas", bg=CARD, fg=GREY,
+                 font=("Segoe UI", 20, "bold")).pack(side="left")
+        tk.Label(txt, text=COMPANY, bg=CARD, fg=GREY,
+                 font=("Segoe UI", 9)).pack(anchor="w")
+        tk.Label(txt, text=f"{APP_NAME} · {MOTTO}", bg=CARD, fg=MUTED,
+                 font=("Segoe UI", 9, "italic")).pack(anchor="w")
+
+        # μπλε γραμμή-τόνος κάτω από το header
+        tk.Frame(self, bg=BLUE, height=3).pack(side="top", fill="x")
 
     # ---------------- UI ----------------
     def _build_ui(self):
-        pad = dict(padx=8, pady=6)
+        pad = dict(padx=10, pady=6)
 
-        # Μεγαλύτερο, εμφανές στυλ για το κουμπί έναρξης
-        style = ttk.Style(self)
-        try:
-            style.configure("Start.TButton", font=("", 12, "bold"), padding=8)
-        except Exception:
-            pass
+        self._build_header()
 
         top = ttk.Frame(self)
         top.pack(side="top", fill="x", **pad)
@@ -89,36 +239,47 @@ class App(tk.Tk):
 
         prow = ttk.Frame(actions)
         prow.pack(fill="x", pady=(6, 0))
-        self.progress = ttk.Progressbar(prow, mode="determinate", maximum=100)
+        self.progress = ttk.Progressbar(prow, mode="determinate", maximum=100,
+                                        style="Brand.Horizontal.TProgressbar")
         self.progress.pack(side="left", fill="x", expand=True)
         self.pct_var = tk.StringVar(value="0%")
-        ttk.Label(prow, textvariable=self.pct_var, width=6,
-                  anchor="e").pack(side="left", padx=(8, 0))
+        ttk.Label(prow, textvariable=self.pct_var, width=6, anchor="e",
+                  font=("Segoe UI", 10, "bold")).pack(side="left", padx=(8, 0))
         self.status_var = tk.StringVar(value="Έτοιμο.")
-        ttk.Label(actions, textvariable=self.status_var, anchor="w").pack(
-            fill="x", pady=(4, 0))
+        ttk.Label(actions, textvariable=self.status_var, anchor="w",
+                  style="Muted.TLabel").pack(fill="x", pady=(4, 0))
 
-        self.log = tk.Text(actions, height=8, wrap="word", state="disabled")
+        self.log = tk.Text(actions, height=7, wrap="word", state="disabled",
+                           bg=CARD, fg=INK, relief="flat", borderwidth=1,
+                           highlightthickness=1, highlightbackground="#C7D0DE",
+                           font=("Consolas", 9))
         self.log.pack(fill="x", pady=(6, 0))
+
+        # Footer branding
+        tk.Frame(actions, bg="#C7D0DE", height=1).pack(fill="x", pady=(8, 0))
+        tk.Label(actions, text=f"© {COMPANY}", bg=BG, fg=MUTED,
+                 font=("Segoe UI", 8)).pack(anchor="e", pady=(3, 0))
 
         body = ttk.Panedwindow(self, orient="horizontal")
         body.pack(side="top", fill="both", expand=True, **pad)
 
         # ----- Αριστερά: αναζήτηση & επιλογή ΚΑΔ -----
-        left = ttk.Labelframe(body, text="1) ΚΑΔ")
+        left = ttk.Labelframe(body, text="1) ΚΑΔ", style="Card.TLabelframe")
         body.add(left, weight=3)
 
-        srow = ttk.Frame(left)
+        srow = ttk.Frame(left, style="Card.TFrame")
         srow.pack(fill="x", padx=6, pady=6)
-        ttk.Label(srow, text="Αναζήτηση:").pack(side="left")
+        ttk.Label(srow, text="Αναζήτηση:", background=CARD).pack(side="left")
         self.search_var = tk.StringVar()
+        self.search_var.trace_add("write", lambda *a: self._filter_local())
         ent = ttk.Entry(srow, textvariable=self.search_var)
         ent.pack(side="left", fill="x", expand=True, padx=6)
         ent.bind("<Return>", lambda e: self.do_search())
-        ttk.Button(srow, text="Ψάξε", command=self.do_search).pack(side="left")
+        ttk.Button(srow, text="Ψάξε", style="Accent.TButton",
+                   command=self.do_search).pack(side="left")
 
-        ttk.Label(left, text="Αποτελέσματα (διπλό κλικ ή «Προσθήκη» για επιλογή):").pack(
-            anchor="w", padx=6)
+        ttk.Label(left, text="Αποτελέσματα (διπλό κλικ ή «Προσθήκη» για επιλογή):",
+                  background=CARD, foreground=MUTED).pack(anchor="w", padx=6)
         res_wrap = ttk.Frame(left)
         res_wrap.pack(fill="both", expand=True, padx=6, pady=(0, 6))
         self.results = ttk.Treeview(res_wrap, columns=("id", "descr"), show="headings",
@@ -133,15 +294,15 @@ class App(tk.Tk):
         rsb.pack(side="right", fill="y")
         self.results.bind("<Double-1>", lambda e: self.add_selected())
 
-        arow = ttk.Frame(left)
+        arow = ttk.Frame(left, style="Card.TFrame")
         arow.pack(fill="x", padx=6, pady=(0, 6))
-        ttk.Button(arow, text="➕ Προσθήκη στην εξαγωγή", command=self.add_selected).pack(
-            side="left")
-        ttk.Button(arow, text="Προσθήκη με κωδικό…", command=self.add_manual).pack(
-            side="left", padx=6)
+        ttk.Button(arow, text="➕ Προσθήκη στην εξαγωγή", style="Accent.TButton",
+                   command=self.add_selected).pack(side="left")
+        ttk.Button(arow, text="Προσθήκη με κωδικό…", style="Ghost.TButton",
+                   command=self.add_manual).pack(side="left", padx=6)
 
-        ttk.Label(left, text="Επιλεγμένοι ΚΑΔ προς εξαγωγή (1 Excel ανά ΚΑΔ):").pack(
-            anchor="w", padx=6)
+        ttk.Label(left, text="Επιλεγμένοι ΚΑΔ προς εξαγωγή (1 Excel ανά ΚΑΔ):",
+                  background=CARD, foreground=MUTED).pack(anchor="w", padx=6)
         sel_wrap = ttk.Frame(left)
         sel_wrap.pack(fill="both", expand=True, padx=6, pady=(0, 6))
         self.chosen = ttk.Treeview(sel_wrap, columns=("id", "descr"), show="headings",
@@ -154,21 +315,26 @@ class App(tk.Tk):
         self.chosen.configure(yscrollcommand=csb.set)
         self.chosen.pack(side="left", fill="both", expand=True)
         csb.pack(side="right", fill="y")
-        ttk.Button(left, text="➖ Αφαίρεση επιλεγμένου", command=self.remove_selected).pack(
-            anchor="w", padx=6, pady=(0, 6))
+        ttk.Button(left, text="➖ Αφαίρεση επιλεγμένου", style="Ghost.TButton",
+                   command=self.remove_selected).pack(anchor="w", padx=6, pady=(0, 6))
 
         # ----- Δεξιά: νομοί -----
-        right = ttk.Labelframe(body, text="2) Νομοί")
+        right = ttk.Labelframe(body, text="2) Νομοί", style="Card.TLabelframe")
         body.add(right, weight=2)
         self.all_pref_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(right, text="ΟΛΗ η Ελλάδα (όλοι οι νομοί)",
-                        variable=self.all_pref_var, command=self._toggle_all_pref).pack(
-            anchor="w", padx=8, pady=6)
-        ttk.Label(right, text="ή διάλεξε συγκεκριμένους (Ctrl/Shift για πολλαπλή):").pack(
-            anchor="w", padx=8)
-        pf_wrap = ttk.Frame(right)
+        cb = ttk.Checkbutton(right, text="ΟΛΗ η Ελλάδα (όλοι οι νομοί)",
+                             variable=self.all_pref_var, command=self._toggle_all_pref)
+        cb.configure(style="Card.TCheckbutton")
+        cb.pack(anchor="w", padx=8, pady=6)
+        ttk.Label(right, text="ή διάλεξε συγκεκριμένους (Ctrl/Shift για πολλαπλή):",
+                  background=CARD, foreground=MUTED).pack(anchor="w", padx=8)
+        pf_wrap = ttk.Frame(right, style="Card.TFrame")
         pf_wrap.pack(fill="both", expand=True, padx=8, pady=(0, 6))
-        self.pref_list = tk.Listbox(pf_wrap, selectmode="extended", exportselection=False)
+        self.pref_list = tk.Listbox(pf_wrap, selectmode="extended", exportselection=False,
+                                    bg=CARD, fg=INK, selectbackground=NAVY,
+                                    selectforeground="white", highlightthickness=1,
+                                    highlightbackground="#C7D0DE", relief="flat",
+                                    disabledforeground="#9AA6B2", activestyle="none")
         for name in core.PREF_NAMES:
             self.pref_list.insert("end", name)
         psb = ttk.Scrollbar(pf_wrap, orient="vertical", command=self.pref_list.yview)
@@ -187,28 +353,47 @@ class App(tk.Tk):
         self.log.see("end")
         self.log.configure(state="disabled")
 
-    def do_search(self):
-        kw = self.search_var.get().strip()
-        if not kw:
+    def load_catalog(self):
+        """Φορτώνει ΟΛΟΚΛΗΡΟ τον κατάλογο ΚΑΔ (τρέχουσα ταξινομία) στο άνοιγμα."""
+        if self._catalog_loading:
             return
-        self.status_var.set(f"Αναζήτηση «{kw}»…")
-        self.results.delete(*self.results.get_children())
+        self._catalog_loading = True
+        self.status_var.set("Φόρτωση καταλόγου ΚΑΔ…")
 
         def work():
             try:
-                hits = core.search_activities(kw, api_key=self.api_var.get().strip())
-                self.msg_q.put(("search_done", hits))
+                acts = core.list_activities(api_key=self.api_var.get().strip())
+                self.msg_q.put(("catalog", acts))
             except Exception as e:
-                self.msg_q.put(("error", f"Σφάλμα αναζήτησης: {e}"))
+                self.msg_q.put(("catalog_error", str(e)))
 
         threading.Thread(target=work, daemon=True).start()
 
+    def do_search(self):
+        # Αν έχει φορτωθεί ο κατάλογος, φιλτράρουμε τοπικά (άμεσα).
+        if self.all_activities:
+            self._filter_local()
+        else:
+            self.load_catalog()
+
+    def _filter_local(self):
+        """Φιλτράρει τον τοπικό κατάλογο ΚΑΔ (χωρίς τόνους). Κενό = όλοι."""
+        if not self.all_activities:
+            return
+        kw = core.strip_acc(self.search_var.get())
+        hits = [a for a in self.all_activities
+                if kw in core.strip_acc(a.get("descr", ""))]
+        self._fill_results(hits)
+
     def _fill_results(self, hits):
+        self.results.delete(*self.results.get_children())
         for a in hits:
             self.results.insert("", "end", values=(a.get("id"), a.get("descr")))
-        self.status_var.set(f"Βρέθηκαν {len(hits)} ΚΑΔ.")
-        if not hits:
-            self.log_msg("Δεν βρέθηκαν ΚΑΔ για αυτή τη λέξη.")
+        total = len(self.all_activities)
+        if total and len(hits) != total:
+            self.status_var.set(f"{len(hits)} από {total} ΚΑΔ (φίλτρο).")
+        else:
+            self.status_var.set(f"{len(hits)} ΚΑΔ στον κατάλογο.")
 
     def add_selected(self):
         for item in self.results.selection():
@@ -328,6 +513,22 @@ class App(tk.Tk):
                 kind, payload = self.msg_q.get_nowait()
                 if kind == "search_done":
                     self._fill_results(payload)
+                elif kind == "catalog":
+                    self._catalog_loading = False
+                    self.all_activities = payload
+                    self._filter_local()
+                    self.log_msg(f"Φορτώθηκε ο κατάλογος: {len(payload)} ΚΑΔ "
+                                 f"(τρέχουσα ταξινομία).")
+                elif kind == "catalog_error":
+                    self._catalog_loading = False
+                    self.status_var.set("Αποτυχία φόρτωσης καταλόγου ΚΑΔ.")
+                    self.log_msg(f"Σφάλμα φόρτωσης καταλόγου ΚΑΔ: {payload}")
+                    messagebox.showerror(
+                        "Πρόβλημα σύνδεσης",
+                        "Δεν φορτώθηκε ο κατάλογος ΚΑΔ.\n\n"
+                        "Έλεγξε τη σύνδεση στο διαδίκτυο και το API key, "
+                        "και πάτα ξανά «Ψάξε».\n\n"
+                        f"Λεπτομέρεια: {payload}")
                 elif kind == "log":
                     self.log_msg(payload)
                 elif kind == "status":
