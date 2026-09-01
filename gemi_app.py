@@ -77,6 +77,7 @@ class App(tk.Tk):
         self.selected_kads = {}  # id -> descr
         self.all_activities = []  # πλήρης κατάλογος ΚΑΔ (cache)
         self._catalog_loading = False
+        self.out_dir = self._resolve_out_dir()
 
         self._setup_style()
         self._build_ui()
@@ -372,6 +373,32 @@ class App(tk.Tk):
         self.pref_list.configure(state="disabled")
 
     # ---------------- ενέργειες ----------------
+    def _resolve_out_dir(self):
+        """
+        Επιστρέφει έναν ΣΙΓΟΥΡΑ εγγράψιμο φάκελο εξόδου (τα αρχεία δίπλα στο
+        .exe μπορεί να αποτυγχάνουν με «Access denied» σε προστατευμένες θέσεις).
+        Προτίμηση: Έγγραφα/Documents → home → temp.
+        """
+        import tempfile
+        home = os.path.expanduser("~")
+        candidates = []
+        docs = os.path.join(home, "Documents")
+        if os.path.isdir(docs):
+            candidates.append(os.path.join(docs, "DMS_GEMH_output"))
+        candidates.append(os.path.join(home, "DMS_GEMH_output"))
+        candidates.append(os.path.join(tempfile.gettempdir(), "DMS_GEMH_output"))
+        for d in candidates:
+            try:
+                os.makedirs(d, exist_ok=True)
+                test = os.path.join(d, ".write_test")
+                with open(test, "w") as fh:
+                    fh.write("ok")
+                os.remove(test)
+                return d
+            except Exception:
+                continue
+        return os.path.abspath("output")
+
     def _toggle_all_pref(self):
         self.pref_list.configure(state="disabled" if self.all_pref_var.get() else "normal")
 
@@ -492,6 +519,7 @@ class App(tk.Tk):
         self.log_msg("=" * 60)
         self.log_msg(f"Έναρξη εξαγωγής: {len(kads)} ΚΑΔ | Νομοί: "
                      f"{'ΟΛΗ η Ελλάδα' if prefs == 'ALL' else ', '.join(prefs)}")
+        self.log_msg(f"Φάκελος εξόδου: {self.out_dir}")
         self.log_msg("Μεγάλοι ΚΑΔ σε όλη την Ελλάδα μπορεί να θέλουν 40–90 λεπτά "
                      "(όριο ~8 αιτήματα/λεπτό). Άφησέ το να τρέξει.")
 
@@ -518,7 +546,7 @@ class App(tk.Tk):
 
                 try:
                     path, rows = core.export_kad(
-                        kad, prefectures=prefs, out_dir="output", api_key=api_key,
+                        kad, prefectures=prefs, out_dir=self.out_dir, api_key=api_key,
                         primary_only=primary, progress=prog, should_stop=should_stop,
                         on_progress=on_prog)
                     self.msg_q.put(("kad_done", (kad, path, rows)))
@@ -536,12 +564,21 @@ class App(tk.Tk):
         self.status_var.set("Ακύρωση…")
 
     def open_output(self):
-        path = os.path.abspath("output")
-        os.makedirs(path, exist_ok=True)
+        path = self.out_dir
         try:
-            webbrowser.open(f"file://{path}")
+            os.makedirs(path, exist_ok=True)
         except Exception:
-            messagebox.showinfo("output", path)
+            pass
+        try:
+            if sys.platform.startswith("win"):
+                os.startfile(path)  # noqa: S606 (Windows Explorer)
+            elif sys.platform == "darwin":
+                import subprocess
+                subprocess.Popen(["open", path])
+            else:
+                webbrowser.open(f"file://{path}")
+        except Exception:
+            messagebox.showinfo("Φάκελος εξόδου", path)
 
     # ---------------- ουρά μηνυμάτων από threads ----------------
     def _drain_queue(self):
@@ -590,9 +627,10 @@ class App(tk.Tk):
                     if not self.stop_flag.is_set():
                         self.progress["value"] = 100
                         self.pct_var.set("100%")
-                    self.status_var.set(f"Ολοκληρώθηκε: {n} αρχείο(α) στο output/.")
+                    self.status_var.set(f"Ολοκληρώθηκε: {n} αρχείο(α) στον φάκελο εξόδου.")
                     self.log_msg(f"\nΟλοκληρώθηκε. Δημιουργήθηκαν {n} αρχείο(α) στον "
-                                 f"φάκελο output/.")
+                                 f"φάκελο:\n  {self.out_dir}\n"
+                                 f"(κουμπί «📂 Άνοιγμα φακέλου output» για να τα δεις)")
         except queue.Empty:
             pass
         self.after(120, self._drain_queue)
